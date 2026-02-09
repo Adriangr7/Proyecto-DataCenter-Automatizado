@@ -1,0 +1,15 @@
+###############################################
+# PLAY: Configurar BGP underlay en spines y leafs
+###############################################
+- hosts: spines, leafs
+  gather_facts: no
+
+  handlers:
+    - name: restart frr
+      ansible.builtin.service:
+        name: frr
+        state: restarted
+
+  tasks:
+    - include_tasks: tasks/bgp.yml
+

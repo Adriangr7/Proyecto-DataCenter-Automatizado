@@ -1,0 +1,39 @@
+---
+- name: Definir variables del Spine
+  set_fact:
+    loopback_ip: "{{ (hostvars['localhost'].device_loopbacks | from_json)[inventory_hostname] }}"
+    leaf_peering:
+      - { name: 'Leaf_Router_1', asn: 65101 }
+      - { name: 'Leaf_Router_2', asn: 65102 }
+
+- name: Resetear BGP para aplicar Router-ID correcto
+  eos_config:
+    lines: 
+      - "no router bgp {{ spine_asn }}"
+    match: none
+
+- name: Configurar BGP Global en Spine
+  eos_config:
+    parents: "router bgp {{ spine_asn }}"
+    lines:
+      - "router-id {{ loopback_ip }}"
+      - "no bgp default ipv4-unicast"
+
+- name: Configurar Vecinos Leaf (Sesiones EVPN)
+  eos_config:
+    parents: "router bgp {{ spine_asn }}"
+    lines:
+      - "neighbor {{ (hostvars['localhost'].device_loopbacks | from_json)[item.name] }} remote-as {{ item.asn }}"
+      - "neighbor {{ (hostvars['localhost'].device_loopbacks | from_json)[item.name] }} update-source Loopback0"
+      - "neighbor {{ (hostvars['localhost'].device_loopbacks | from_json)[item.name] }} description EVPN_PEER_{{ item.name }}"
+  with_items: "{{ leaf_peering }}"
+
+- name: Activar Familia EVPN y Route Reflector
+  eos_config:
+    parents: 
+      - "router bgp {{ spine_asn }}"
+      - "address-family evpn"
+    lines:
+      - "neighbor {{ (hostvars['localhost'].device_loopbacks | from_json)[item.name] }} activate"
+      - "neighbor {{ (hostvars['localhost'].device_loopbacks | from_json)[item.name] }} route-reflector-client"
+  with_items: "{{ leaf_peering }}"

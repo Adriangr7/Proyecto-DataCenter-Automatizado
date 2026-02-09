@@ -1,0 +1,13 @@
+! BGP underlay - Spine {{ inventory_hostname }}
+
+router bgp {{ device_asn }}
+  router-id {{ loopback_ip.split('/')[0] }}
+
+{% for neigh in bgp_neighbors_underlay %}
+  neighbor {{ neigh.peer_ip }} remote-as {{ neigh.peer_asn }}
+{% endfor %}
+
+{% if loopback_ip is defined %}
+  network {{ loopback_ip }}
+{% endif %}
+

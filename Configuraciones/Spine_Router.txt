@@ -1,0 +1,70 @@
+localhost#show running-config
+! Command: show running-config
+! device: localhost (vEOS-lab, EOS-4.29.2F)
+!
+! boot system flash:/vEOS-lab.swi
+!
+no aaa root
+!
+username admin privilege 15 role network-admin secret sha512 $6$G84qEFH51y4TUtnm$smOt6/MkyvgGmrPnCj5Yx25kpQzzW2kmoGLo6WVDAaoNXMpy/IEX1xXzlVLJHbR/405NbWgitO3SBSulZX/dy0
+!
+transceiver qsfp default-mode 4x10G
+!
+service routing protocols model multi-agent
+!
+spanning-tree mode mstp
+!
+management api http-commands
+   protocol http
+   no shutdown
+!
+management api netconf
+   transport ssh default
+!
+aaa authorization exec default local
+!
+interface Ethernet1
+   description Enlace_Fisico_Underlay
+   no switchport
+   ip address 10.0.1.138/31
+!
+interface Ethernet2
+   description Enlace_Fisico_Underlay
+   no switchport
+   ip address 10.0.1.140/31
+!
+interface Ethernet3
+   no switchport
+!
+interface Ethernet4
+!
+interface Loopback0
+   ip address 172.16.0.0/32
+!
+interface Management1
+   ip address 192.168.18.141/24
+!
+ip routing
+!
+router bgp 65000
+   router-id 172.16.0.0
+   no bgp default ipv4-unicast
+   neighbor 10.0.1.139 remote-as 65101
+   neighbor 10.0.1.141 remote-as 65102
+   !
+   address-family evpn
+      neighbor 10.0.1.139 activate
+      neighbor 10.0.1.139 next-hop-unchanged
+      neighbor 10.0.1.141 activate
+      neighbor 10.0.1.141 next-hop-unchanged
+   !
+   address-family ipv4
+      neighbor 10.0.1.139 activate
+      neighbor 10.0.1.141 activate
+      network 172.16.0.0/32
+      redistribute connected
+!
+management ssh
+   authentication mode password
+!
+end

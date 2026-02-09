@@ -1,0 +1,39 @@
+###############################################
+# 1. Obtener ID del interface del spine
+###############################################
+- name: Obtener ID del interface del spine
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ link.spine }}&name={{ link.spine_if }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: spine_if_raw
+
+
+###############################################
+# 2. Obtener IP asignada al interface del spine
+###############################################
+- name: Obtener IP del spine desde NetBox
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?assigned_object_type=dcim.interface&assigned_object_id={{ spine_if_raw.json.results[0].id }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: spine_ip
+
+
+###############################################
+# 3. Configurar SPINE vía eAPI
+###############################################
+- name: Configurar underlay en el spine (eAPI)
+  arista.eos.eos_config:
+    parents: "interface {{ link.spine_if }}"
+    lines:
+      - description P2P hacia {{ link.leaf }}
+      - no switchport
+      - no shutdown
+      - ip address {{ spine_ip.json.results[0].address.split('/')[0] }}/31
+  become: true
+  become_method: enable
