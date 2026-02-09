@@ -1,0 +1,43 @@
+---
+- name: Definir variables del Leaf
+  set_fact:
+    loopback_ip: "{{ (hostvars['localhost'].device_loopbacks | from_json)[inventory_hostname] }}"
+    spine_ip: "{{ (hostvars['localhost'].device_loopbacks | from_json)['Spine_Router'] }}"
+    my_asn: "{{ 65101 if inventory_hostname == 'Leaf_Router_1' else 65102 }}"
+
+- name: Limpiar BGP previo para asegurar Router-ID
+  eos_config:
+    lines:
+      - "no router bgp 65101"
+      - "no router bgp 65102"
+    match: none
+
+- name: Configurar BGP Base en Leaf
+  eos_config:
+    parents: "router bgp {{ my_asn }}"
+    lines:
+      - "router-id {{ loopback_ip }}"
+      - "no bgp default ipv4-unicast"
+
+- name: Configurar Vecino Spine (EVPN Underlay)
+  eos_config:
+    parents: "router bgp {{ my_asn }}"
+    lines:
+      - "neighbor {{ spine_ip }} remote-as {{ spine_asn }}"
+      - "neighbor {{ spine_ip }} update-source Loopback0"
+      - "neighbor {{ spine_ip }} ebgp-multihop 3"
+
+- name: Activar Familia EVPN en Leaf
+  eos_config:
+    parents: 
+      - "router bgp {{ my_asn }}"
+      - "address-family evpn"
+    lines:
+      - "neighbor {{ spine_ip }} activate"
+
+- name: Configurar Interface Vxlan1
+  eos_config:
+    lines:
+      - "interface Vxlan1"
+      - "   vxlan source-interface Loopback0"
+      - "   vxlan udp-port 4789"

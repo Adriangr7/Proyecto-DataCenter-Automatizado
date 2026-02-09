@@ -1,0 +1,40 @@
+###############################################
+# 1. Obtener ID del interface del leaf
+###############################################
+- name: Obtener ID del interface del leaf
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ link.leaf }}&name={{ link.leaf_if }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: leaf_if_raw
+
+
+###############################################
+# 2. Obtener IP asignada al interface del leaf
+###############################################
+- name: Obtener IP del leaf desde NetBox
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?assigned_object_type=dcim.interface&assigned_object_id={{ leaf_if_raw.json.results[0].id }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: leaf_ip
+
+
+###############################################
+# 3. Configurar LEAF vía eAPI
+###############################################
+- name: Configurar underlay en el leaf (eAPI)
+  arista.eos.eos_config:
+    parents: "interface {{ link.leaf_if }}"
+    lines:
+      - description P2P hacia {{ link.spine }}
+      - no switchport
+      - no shutdown
+      - ip address {{ leaf_ip.json.results[0].address.split('/')[0] }}/31
+  become: true
+  become_method: enable
+

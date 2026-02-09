@@ -1,0 +1,41 @@
+{% if phase == 'global' %}
+   router-id {{ my_ip }}
+   no bgp default ipv4-unicast
+   distance bgp 20 200 200
+{% for interface in mis_fisicas %}
+{% set peer_ip = interface.ip | ansible.utils.ipaddr('peer') %}
+   neighbor {{ peer_ip }} remote-as {{ (65100 + loop.index) if inventory_hostname in groups['spines'] else spine_asn }}
+   neighbor {{ peer_ip }} description P2P_HACIA_VECINO
+{% endfor %}
+{% if inventory_hostname in groups['spines'] %}
+{% for leaf in groups['leafs'] %}
+{% set leaf_loop = (hostvars['localhost'].topology | from_yaml).loopbacks[leaf] %}
+   neighbor {{ leaf_loop }} remote-as {{ 65100 + loop.index }}
+   neighbor {{ leaf_loop }} update-source Loopback0
+   neighbor {{ leaf_loop }} ebgp-multihop 3
+{% endfor %}
+{% else %}
+   neighbor {{ spine_ip }} remote-as {{ spine_asn }}
+   neighbor {{ spine_ip }} update-source Loopback0
+   neighbor {{ spine_ip }} ebgp-multihop 3
+{% endif %}
+{% endif %}
+
+{% if phase == 'families' %}
+   address-family ipv4
+{% for interface in mis_fisicas %}
+      neighbor {{ interface.ip | ansible.utils.ipaddr('peer') }} activate
+{% endfor %}
+      network {{ my_ip }}/32
+   !
+   address-family evpn
+{% if inventory_hostname in groups['spines'] %}
+{% for leaf in groups['leafs'] %}
+{% set leaf_loop = (hostvars['localhost'].topology | from_yaml).loopbacks[leaf] %}
+      neighbor {{ leaf_loop }} activate
+      neighbor {{ leaf_loop }} route-reflector-client
+{% endfor %}
+{% else %}
+      neighbor {{ spine_ip }} activate
+{% endif %}
+{% endif %}

@@ -1,0 +1,46 @@
+netbox_url: "http://192.168.18.140:8000"
+netbox_token: "e4a5c3f51406960c5ee73248e3aafa8320266b2d"
+
+netbox_api: "http://192.168.18.140:8000"
+netbox_validate_certs: false
+
+underlay_pool: "10.0.1.128/25"
+underlay_prefix_length: 31
+
+spine_asn: 65000
+leaf_asn_base: 65100
+
+evpn_rt_base: 10      # base para route-targets (ej: 10:VLAN_ID)
+
+links:
+  - name: spine1_leaf1
+    spine: Spine_Router
+    spine_if: Ethernet1
+    leaf: Leaf_Router_1
+    leaf_if: Ethernet2
+
+  - name: spine1_leaf2
+    spine: Spine_Router
+    spine_if: Ethernet2
+    leaf: Leaf_Router_2
+    leaf_if: Ethernet2
+
+loopback_pools:
+  spine: "172.16.0.0/24"
+  leaf: "172.16.1.0/24"
+  server: "172.16.2.0/24"
+
+sdn_controller_ip: "192.168.18.132" 
+
+# Añade esto al final de group_vars/all.yml
+odl_url: "http://192.168.18.132:8181/restconf/config/network-topology:network-topology/topology/topology-netconf"
+odl_user: "admin"
+odl_pass: "admin"
+# Credenciales para que ODL entre al Arista
+arista_netconf_user: "admin"
+arista_netconf_pass: "admin"
+
+vxlan_offset: 1000   # para calcular VNI = VLAN + 1000
+
+evpn_vlans: "{{ lookup('netbox.netbox_vlans', filter={'site': 'lab_site'}, token='NETBOX_API_TOKEN', api_url='http://netbox.example/api') }}"
+vxlan_offset: 1000

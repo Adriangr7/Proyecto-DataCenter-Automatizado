@@ -1,0 +1,82 @@
+###############################################
+# 1. Determinar tipo de dispositivo
+###############################################
+- name: Determinar tipo de dispositivo
+  set_fact:
+    device_type: "{{ 'spine' if inventory_hostname in groups['spines'] else 'leaf' }}"
+
+- debug:
+    msg: "Device {{ inventory_hostname }} es de tipo {{ device_type }}"
+
+###############################################
+# 2. Obtener prefix padre desde NetBox
+###############################################
+- name: Obtener prefix padre para loopback
+  uri:
+    url: "{{ netbox_url }}/api/ipam/prefixes/?prefix={{ loopback_pools[device_type] }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: loopback_prefix
+  delegate_to: localhost
+
+###############################################
+# 3. Obtener /32 disponible
+###############################################
+- name: Obtener /32 disponible para loopback
+  uri:
+    url: "{{ netbox_url }}/api/ipam/prefixes/{{ loopback_prefix.json.results[0].id }}/available-prefixes/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      prefix_length: 32
+    return_content: yes
+    status_code: 201
+  register: loopback_prefix32
+  delegate_to: localhost
+
+###############################################
+# 4. Obtener ID de Loopback0
+###############################################
+- name: Obtener ID de Loopback0
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ inventory_hostname }}&name=Loopback0"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: loopback_if_raw
+  delegate_to: localhost
+
+###############################################
+# 5. Crear IP /32 en NetBox
+###############################################
+- name: Asignar IP /32 a Loopback0
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/"
+    method: POST
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      address: "{{ loopback_prefix32.json.prefix }}"
+      assigned_object_type: "dcim.interface"
+      assigned_object_id: "{{ loopback_if_raw.json.results[0].id }}"
+    return_content: yes
+    status_code: 201
+  delegate_to: localhost
+
+###############################################
+# 6. Guardar ID en localhost
+###############################################
+- name: Guardar ID de Loopback0 en localhost
+  set_fact:
+    "{{ inventory_hostname }}_loopback_if_id": "{{ loopback_if_raw.json.results[0].id }}"
+  delegate_to: localhost
+  delegate_facts: true
+

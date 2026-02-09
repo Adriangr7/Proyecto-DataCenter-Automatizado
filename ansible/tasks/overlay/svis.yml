@@ -1,0 +1,55 @@
+---
+# tasks/overlay/svis.yml
+# Configura las interfaces VlanX en los leafs leyendo IPs desde NetBox
+
+- name: Obtener interfaces VLAN (SVIs) del leaf
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ inventory_hostname }}&type=virtual"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: leaf_svis_raw
+  delegate_to: localhost
+
+- name: Inicializar lista de SVIs
+  set_fact:
+    leaf_svis: []
+
+- name: Obtener IP de cada SVI
+  vars:
+    this_if: "{{ item }}"
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?assigned_object_type=dcim.interface&assigned_object_id={{ this_if.id }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: svi_ip_raw
+  delegate_to: localhost
+  loop: "{{ leaf_svis_raw.json.results }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Construir lista final de SVIs con IP
+  set_fact:
+    leaf_svis: >-
+      {{
+        leaf_svis + [{
+          'name': item.0.name,
+          'ip': item.1.json.results[0].address
+        }]
+      }}
+  loop: "{{ leaf_svis_raw.json.results | zip(svi_ip_raw.results) | list }}"
+
+- name: Configurar SVIs en EOS
+  eos_config:
+    parents: "interface {{ item.name }}"
+    lines:
+      - "ip address {{ item.ip }}"
+      - "no shutdown"
+  loop: "{{ leaf_svis }}"
+  when: leaf_svis | length > 0
+  become: yes
+  become_method: enable
+

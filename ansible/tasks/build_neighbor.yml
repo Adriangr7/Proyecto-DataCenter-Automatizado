@@ -1,0 +1,74 @@
+# tasks/build_neighbor.yml
+###############################################
+# Construir vecinos para un link (this_link)
+# Variables esperadas: this_link
+###############################################
+
+- name: Obtener ID interface del spine (delegado)
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ this_link.spine }}&name={{ this_link.spine_if }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: spine_if_raw
+  delegate_to: localhost
+
+- name: Obtener IP asignada al interface del spine
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?assigned_object_type=dcim.interface&assigned_object_id={{ spine_if_raw.json.results[0].id }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: spine_ip_raw
+  delegate_to: localhost
+
+- name: Obtener ID interface del leaf (delegado)
+  uri:
+    url: "{{ netbox_url }}/api/dcim/interfaces/?device={{ this_link.leaf }}&name={{ this_link.leaf_if }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: leaf_if_raw
+  delegate_to: localhost
+
+- name: Obtener IP asignada al interface del leaf
+  uri:
+    url: "{{ netbox_url }}/api/ipam/ip-addresses/?assigned_object_type=dcim.interface&assigned_object_id={{ leaf_if_raw.json.results[0].id }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    return_content: yes
+  register: leaf_ip_raw
+  delegate_to: localhost
+
+- name: Añadir vecino para el leaf
+  set_fact:
+    underlay_neighbors: >-
+      {{
+        underlay_neighbors +
+        ([{
+          'ip': spine_ip_raw.json.results[0].address.split('/')[0],
+          'asn': spine_asn
+        }]
+        if inventory_hostname == this_link.leaf
+        and spine_ip_raw.json.results[0].address.split('/')[1] == '31'
+        else [])
+      }}
+
+- name: Añadir vecino para el spine
+  set_fact:
+    underlay_neighbors: >-
+      {{
+        underlay_neighbors +
+        ([{
+          'ip': leaf_ip_raw.json.results[0].address.split('/')[0],
+          'asn': leaf_asn_base + (this_link.leaf.split('_')[-1] | int)
+        }]
+        if inventory_hostname == this_link.spine
+        and leaf_ip_raw.json.results[0].address.split('/')[1] == '31'
+        else [])
+      }}
+
