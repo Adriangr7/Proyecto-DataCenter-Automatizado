@@ -48,19 +48,6 @@ y **Arista vEOS**, simulando un entorno de Data Center real.
 
 ---
 
-## 🔹 Documentación
-
-- 📘 [Arquitectura](docs/es/02-arquitectura.md)
-- 📘 [NetBox como Source of Truth](docs/es/04-netbox.md)
-- 📘 [Underlay BGP](docs/es/05-underlay-bgp.md)
-- 📘 [Overlay VXLAN EVPN](docs/es/06-overlay-vxlan-evpn.md)
-- 📘 [Automatización con Ansible](docs/es/07-ansible.md)
-- 📘 [Validación y pruebas](docs/es/09-validacion.md)
-
----
-
----
-
 ## 🔹 Overview 🇬🇧
 
 This project implements a **fully automated modern Data Center**
